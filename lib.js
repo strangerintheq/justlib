@@ -266,6 +266,23 @@ function webglProgram(fs, vs = defaultVertexShader) {
         gl.drawArrays(points ? gl.POINTS : gl.TRIANGLES, 0, count);
     };
 
+    function print(str, i, message) {
+        if (!state.log) {
+            state.log = document.createElement('div');
+            state.log.style.fontFamily = 'Courier New, monospace';
+            state.log.style.position = 'fixed';
+            state.log.style.top = '0';
+            state.log.innerHTML = "<h1>SHADER ERROR<h1>"
+            document.body.append(state.log);
+        }
+        let line = 1 + i;
+        let currentLine = line === +message.split(':')[2];
+        let msg = ("" + line).padStart(4, "0") + ': ' + str.split(' ').join('&nbsp;');
+        if (currentLine)
+            msg = '<br>' + message + '<br>' + msg + '<br><br>';
+        state.log.innerHTML += `<div ${currentLine && 'style="background:#900;color:#fff"'}>${msg}</div>`
+    }
+
     function shader(src, type) {
         const id = gl.createShader(type);
         src = prepare(src);
@@ -273,9 +290,8 @@ function webglProgram(fs, vs = defaultVertexShader) {
         gl.shaderSource(id, src);
         gl.compileShader(id);
         const message = gl.getShaderInfoLog(id);
-        if (message.length > 0) {
-            console.log(src.split('\n').map((str, i) =>
-                ("" + (1 + i)).padStart(4, "0") + ": " + str).join('\n'));
+        if (message) {
+            src.split('\n').map((line,i) => print(line, i, message))
             throw message;
         }
         gl.attachShader(pid, id);
@@ -300,9 +316,9 @@ function webglProgram(fs, vs = defaultVertexShader) {
             }).join("");
         }
 
-        patch("RND", rnd);
         patch("RNDI", rndi);
         patch("RNDS", rnds);
+        patch("RND", rnd);
 
         if (~code.indexOf('mixColor'))
             code = paletteShaderPart() + code;
@@ -314,10 +330,9 @@ function webglProgram(fs, vs = defaultVertexShader) {
 
     function paletteShaderPart() {
         const p = state.palette, n = p.length;
-        const c = (s, i) => parseInt(s.substr(i, 2), 16) / 255;
+        const c = (s, i) => (parseInt(s.substr(i, 2), 16) / 255).toFixed(4);
         const v = (x) => `vec3(${c(x, 1)},${c(x, 3)},${c(x, 5)});`
-        return `vec3 color(float x){x = mod(x, ${n}.);${many(n, i => `\nif (x < ${i + 1}.)return ${v(p[i])}`).join("")}}
-vec3 mixColor(float x){return mix(color(x),color(x+1.),fract(x));}`;
+        return `\nvec3 color(float x){\nx = mod(x, ${n}.);${many(n, i => `\nif (x < ${i + 1}.)return ${v(p[i])}`).join("")}\n}\n\nvec3 mixColor(float x){return mix(color(x),color(x+1.),fract(x));}\n`;
     }
 
     function lineParams(line) {
