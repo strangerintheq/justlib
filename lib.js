@@ -120,7 +120,7 @@ function createCanvas2d(ratio, k) {
 
 function createCanvasWebgl(ratio, k) {
     createCanvas(ratio, k)
-    state.gl = state.lastCanvas.getContext('webgl');
+    state.gl = state.lastCanvas.getContext('webgl2');
     return state.lastCanvas
 }
 
@@ -167,7 +167,7 @@ function setShape(path, close = true) {
     if (typeof path !== "string") {
         path = "M " + path.join(" L ") + (close ? " Z" : "");
     }
-    //console.log(path)
+    // console.log(path)
     state.shape = new Path2D(path);
 }
 
@@ -181,11 +181,11 @@ function drawShape(method, x = 0, y = 0, r = 0, s = 0) {
     ctx.restore()
 }
 
-function fillShape(x, y, r, s) {
+function fillShape(x=0, y=0, r=0, s=1) {
     drawShape("fill", x, y, r, s)
 }
 
-function strokeShape(x, y, r, s) {
+function strokeShape(x=0, y=0, r=0, s=1) {
     drawShape("stroke", x, y, r, s)
 }
 
@@ -246,7 +246,7 @@ function pseudoShader(s) {
 const fullScreenTriangle = new Float32Array([-1, 3, -1, -1, 3, -1])
 
 const defaultVertexShader = `
-attribute vec2 pt = fullScreenTriangle;
+in vec2 pt = fullScreenTriangle;
 void main() {
     gl_Position = vec4(pt, 0.0, 1.0);
 }`;
@@ -301,7 +301,7 @@ function webglProgram(fs, vs = defaultVertexShader) {
 
         let index = 0;
         code = code.split('\n').map(line => {
-            if (~line.indexOf('attribute'))
+            if (line.startsWith('in'))
                 line = attribute(line);
             else if (~line.indexOf('sampler2D'))
                 line = sampler(line, index++);
@@ -316,14 +316,18 @@ function webglProgram(fs, vs = defaultVertexShader) {
             }).join("");
         }
 
+
+        patch("RND2", () => `vec2(${many(2, () => rnd())})`);
+        patch("RND3", () => `vec3(${many(3, () => rnd())})`);
+        patch("RND4", () => `vec4(${many(4, () => rnd())})`);
         patch("RNDI", rndi);
         patch("RNDS", rnds);
         patch("RND", rnd);
 
-        if (~code.indexOf('mixColor'))
+        if (~code.indexOf('palette'))
             code = paletteShaderPart() + code;
 
-        code = 'precision highp float;\n' + code;
+        code = '#version 300 es\nprecision highp float;\n' + code;
 
         return code;
     }
@@ -332,7 +336,7 @@ function webglProgram(fs, vs = defaultVertexShader) {
         const p = state.palette, n = p.length;
         const c = (s, i) => (parseInt(s.substr(i, 2), 16) / 255).toFixed(4);
         const v = (x) => `vec3(${c(x, 1)},${c(x, 3)},${c(x, 5)});`
-        return `\nvec3 color(float x){\nx = mod(x, ${n}.);${many(n, i => `\nif (x < ${i + 1}.)return ${v(p[i])}`).join("")}\n}\n\nvec3 mixColor(float x){return mix(color(x),color(x+1.),fract(x));}\n`;
+        return `\nvec3 color(float x){\nx = mod(x, ${n}.);${many(n, i => `\nif (x < ${i + 1}.)return ${v(p[i])}`).join("")}\n}\n\nvec3 palette(float x){return mix(color(x),color(x+1.),fract(x));}\n`;
     }
 
     function lineParams(line) {
@@ -384,7 +388,7 @@ function webglProgram(fs, vs = defaultVertexShader) {
             if (!loc)
                 loc = gl.getUniformLocation(pid, name);
             const v = value();
-            console.log(name, 'uniform set value', ...v)
+            // console.log(name, 'uniform set value', ...v)
             f.call(gl, loc, ...v)
         });
         return newLine;
@@ -408,5 +412,6 @@ function webglProgram(fs, vs = defaultVertexShader) {
         return newLine;
     }
 }
+
 
 
