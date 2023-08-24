@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin: 0">
+<script src="lib.js"></script>
+<script src="gui.js"></script>
+<script src="palettes.js"></script>
+<script>
+    const scale = slider("Scale", 1, 3, rnd(2,1));
+    const scale1 = slider("Scale", 1, 7, rnd(6,1));
+    const dx = slider("Delta X", 0, 1, rnd());
+    const dy = slider("Delta Y", 0, 1, rnd());
+    const q = slider("Q", 1, 4, rnd());
+
+    const ratio = innerWidth/innerHeight;
+    palette(pick(Object.values(palettes)));
+
+    const canvas = createCanvasWebgl(ratio);
+    appendCanvas();
+    let t;
+
+    const redraw = webglProgram(`
+    uniform vec2 r = [canvas.width, canvas.height];
+    uniform float scale = [scale.value];
+    uniform float scale1 = [scale1.value];
+    uniform float dx = [dx.value];
+    uniform float dy = [dy.value];
+    uniform float q = [q.value];
+
+    uniform float t = [t];
+
+    void main() {
+        vec2 uv = gl_FragCoord.xy / r.xy - 0.5;
+        uv.x *= r.x / r.y;
+        //
+
+        uv *=scale1;
+
+        for ( int i = 0; i < ${pick([6])}; i++ ) {
+            uv = abs(uv);
+            uv /= dot(uv, uv)*scale;
+            uv -= vec2(dx, dy);
+        }
+        float d;
+        ${pick([
+            // 'd = sin(log(length(uv-RND2)*q)) ' +
+            // '+ sin(log(length(uv-RND2)*q)) ' +
+            // '+ sin(log(length(uv-RND2)*q));',
+            'd = log(abs(uv.x) + abs(uv.y));',
+            // 'd = log(length(uv));',
+        ])}
+
+        d = floor(d*q);
+        gl_FragColor = vec4( palette(d), 1.0 );
+
+    }
+`);
+
+    loop(redraw)
+
+    function loop(f){
+        requestAnimationFrame(function loopFn(time){
+            t = time/1000;
+            f();
+            requestAnimationFrame(loopFn)
+        });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body style="margin: 0">
+    <script src="lib.js"></script>
+    <script>
+        let bg = "white";
+        let fg = "#233479";
+        palette([ "#f29f05", "#233479", "#569cc7", "#f20505"])
+        createCanvas2d(innerWidth/innerHeight)
+        appendCanvas()
+        compose();
+        addEventListener('click', compose);
+
+        function compose() {
+            setShape(rect(5,5));
+
+            fillStyle(bg)
+            fillShape()
+
+            many(1, makeLayer).forEach((layer, i) => {
+                strokeWidth(0.001)
+                strokeStyle(bg)
+                layer.forEach(curve => {
+                    setShape(curve, false);
+                    strokeShape();
+                })
+                strokeWidth(0.0005)
+                strokeStyle('black')
+                layer.forEach(curve => {
+                    setShape(curve, false);
+                    strokeShape();
+                })
+            })
+        }
+
+        function makeLayer() {
+
+            let pts = many(5, () => [rnds(), rnds(), rnd(5) + 1])
+
+            const m = rnd(7);
+            const n = rnd(7);
+            const s = rnd(7);
+            const nz = rnd(1e4);
+            // let max = rnd(0.5)
+            return many(1111, () => {
+
+                let dir,
+                    x = rnds(0.5),
+                    y = rnds(0.5),
+                    value = surface(x, y);
+
+                if (Math.abs(value) > 4)
+                    return
+
+                return many(111, () => {
+                    dir = calcDir(x, y, dir, walk1);
+                    x += cos(dir)*0.002;
+                    y += sin(dir)*0.002;
+                    // fillStyle(abs(surface(x, y))*2.5);
+                    return [x,y]
+                })
+
+            }).filter(el => el)
+
+
+
+            function walk1(x, y, n, dirFn){
+                let value = surface(x, y);
+                let step = 0.001;
+                let d, delta = 1e6;
+                many(n, i => {
+                    let dir_i = dirFn(i/n);
+                    let value_i = surface(x+cos(dir_i)*step, y+sin(dir_i)*step);
+                    let delta_i = abs(value - value_i)
+                    if (delta_i < delta) {
+                        d = dir_i;
+                        delta = delta_i
+                    }
+                })
+                return d
+            }
+
+            function calcDir(x, y, dir, walk) {
+                if (dir !== undefined) {
+                    return walk(x, y, 36, i => dir + i*PI-PI/2)
+                } else {
+                    return walk(x, y, 36, i => i*TAU)
+                }
+            }
+
+            function surface1(x, y) {
+
+                return sin(n*x*s)*sin(m*y*s) + sin(m*x*s)*sin(n*y*s)+noise(x*13,y*13,nz,33)*3
+            }
+
+
+            function surface(x,y){
+                let sum = 0;
+                pts.forEach(pt0 => {
+                    let mul = 1;
+                    let len0 = hypot(pt0[0] - x, pt0[1] - y);
+                    pts.forEach(pt1 => {
+                        let len1 = hypot(pt1[0] - x, pt1[1] - y);
+                        mul *= sin((len1*len0*33.))
+                    })
+                    sum += mul;
+                })
+                return sum;
+            }
+
+        }
+
+    </script>
+</body>
+</html>

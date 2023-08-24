@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin: 0">
+<script src="lib.js"></script>
+<script src="palettes.js"></script>
+<script src="gui.js"></script>
+<script>
+    const dx = slider("dx", 0.1, 0.2, rnd(0.1,0.1))
+    palette(pick(Object.values(palettes)))
+    const ratio = innerWidth/innerHeight;
+    const canvas = createCanvasWebgl(ratio);
+    appendCanvas();
+    let t;
+
+    const redraw = webglProgram(`
+    uniform vec2 r = [canvas.width, canvas.height];
+    uniform float t = [t];
+    uniform float dx = [dx.value];
+    out vec4 myOutputColor;
+
+    vec3 color(vec2 uv, float d) {
+        return fract( RND3 * (sin(d + RND3) + 1.0) )*0.85+0.1;
+    }
+
+    float fn (vec2 uv) {
+      return ${pick([
+        'abs(uv.x) + abs(uv.y)',
+        'length(uv)',
+        'log(length(uv))'
+    ])};
+    }
+
+    void main() {
+        vec2 uv = gl_FragCoord.xy / r.xy - 0.5;
+        uv.x *= r.x / r.y;
+        // uv *= ${rnd(2,1)};
+        float d;
+
+        for (int i = 0; i < ${pick([3,5,7,9])}; i++) {
+            ${pick([
+                'uv.x = abs(uv.x);',
+                'uv.y = abs(uv.y);',
+                'uv = abs(uv);',
+                '',
+            ])}
+            uv = fract(uv + dx);
+            d += fn(uv);
+        }
+        d*=1.5;
+        myOutputColor = vec4( palette(floor(d))*pow(fract(d),.5), 1.0 );
+
+    }
+`);
+
+    loop(redraw)
+
+    function loop(f){
+        requestAnimationFrame(function loopFn(time){
+            t = time/1000;
+            f();
+            requestAnimationFrame(loopFn)
+        });
+    }
+</script>
+</body>
+</html>

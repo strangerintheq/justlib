@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin: 0">
+<script src="lib.js"></script>
+<script src="palettes.js"></script>
+<script>
+    palette(pick(Object.values(palettes)))
+    const ratio = innerWidth/innerHeight;
+    const canvas = createCanvasWebgl(ratio);
+    appendCanvas();
+
+    const redraw = webglProgram(`
+
+uniform vec2 r = [canvas.width, canvas.height];
+out vec4 o;
+
+void main() {
+
+    vec2 uv = gl_FragCoord.xy / r.xy - 0.5;
+    uv.x *= r.x / r.y;
+    vec3 ro = vec3(0, 0, -4.);
+    vec3 rd = normalize(vec3(uv.x, 1.0, uv.y));
+    o = vec4( rd, 1 );
+
+}
+
+`);
+
+    loop(redraw)
+
+    function loop(f){
+        requestAnimationFrame(function loopFn(){
+            f();
+            requestAnimationFrame(loopFn)
+        });
+    }
+</script>
+</body>
+</html>

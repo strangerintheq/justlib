@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin: 0">
+<script src="lib.js"></script>
+<script>
+    createCanvas2d();
+    appendCanvas();
+    strokeWidth(0.001);
+    setShape(rect(1, 1))
+    strokeShape();
+    state.last.scale(0.5,0.5)
+    many(20, i => {
+        const a = i / 10 - 1;
+        //console.log(a);
+        let pts = many(200, j => [
+            j/100-1,
+            1-f(j/100, a)
+        ])
+        //console.log(pts);
+        setShape(pts, false);
+        //console.log(state.shape)
+        strokeShape();
+    })
+
+    function f(x, a) {
+        return min(1, 1/((x+0.000001)**a))
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin: 0">
+<script src="lib.js"></script>
+<script src="palettes.js"></script>
+<script>
+
+    const ratio = innerWidth/innerHeight;
+    palette(pick(Object.values(palettes)));
+
+    const tex1 = createCanvas2d(ratio);
+    // appendCanvas();
+    const tex2 = createCanvas2d(ratio);
+    // appendCanvas();
+    const tex3 = createCanvas2d(ratio);
+    // appendCanvas();
+    const canvas = createCanvasWebgl(ratio);
+    appendCanvas();
+
+    const compose = webglProgram(`
+    uniform vec2 resolution = [canvas.width, canvas.height];
+    uniform sampler2D texture1 = tex1;
+    uniform sampler2D texture2 = tex2;
+    uniform sampler2D texture3 = tex3;
+    void main() {
+        vec2 uv = gl_FragCoord.xy / resolution.xy;
+        float id1 = max(0.03, texture2D(texture1, uv).r)*(RND*15.+5.) + 2.0;
+        float id2 = max(0.03, texture2D(texture2, uv).r)*(RND*15.+5.) + 4.0;
+        float id3 = max(0.03, texture2D(texture3, uv).r)*(RND*5.+5.);
+        float id = id1+ id2 + id3;
+        // id *= 1.-length(uv - 0.5);
+        float e = .1;
+        vec3 color = mix(
+            palette( id1 + id2 ),
+            palette( id3*2.5),
+
+            smoothstep(-e,e,RNDS*3.+sin(uv.x*110.)+sin(uv.x*10.)+sin(uv.x*30.))
+        );
+        gl_FragColor = vec4( color, 1.0 );
+    }
+`);
+
+    addEventListener('click', redraw);
+    redraw();
+
+    function redraw() {
+        prepareTexture(tex1);
+        cloud();
+        prepareTexture(tex2);
+        stars();
+        prepareTexture(tex3);
+        flowField();
+        compose();
+    }
+
+    function prepareTexture(tex){
+        bind(tex);
+        fillStyle("#000000");
+        fillRect(-2, -2, 4, 4);
+        fillStyle("#ffffff01");
+    }
+
+    ///
+
+    function cloud() {
+        setShape(rect(0.3, 0.3));
+        const x = rnds(1), y = rnds(1);
+        many(110, () => {
+            let a = rndr(), r = rnd(0.3);
+            fillShape(
+                x + cos(a) * r,
+                y + sin(a) * r,
+                rndr(),
+                rnd()
+            );
+        });
+    }
+
+    function stars() {
+        many(110, () => {
+            setShape(rect(0.01, rnd(0.2)));
+            const x = rnds(2) * rnd(), y = rnds(2) * rnd();
+            many(rndi(50, 50), () => fillShape(
+                x + rnds(0.02),
+                y + rnds(0.02),
+                rndr(),
+                rnd()
+            ));
+        });
+    }
+
+    function flowField(){
+        let scale = 2;
+        let step = 0.001;
+        let size = 100;
+        let z = rnd(111)+111
+        let s = rnd(111)+111
+        let pts = many(rndi(6,1), () => [rnds(), rnds()])
+        const ff = many(size, X => {
+            const x = X / size - 0.5;
+            return many(size, Y => {
+                const y = Y / size - 0.5;
+                return pts.reduce((acc, [dx,dy]) => acc + atan2(y-dy, x-dx)/pts.length, 0);
+            });
+        });
+
+        let dr1 = rndr()
+
+        let agents = many(rnd(133,33), i => {
+            let x = rnds(scale), y = rnds(scale);
+            const shape = rect(0.01, 0.2);
+            let dr = dr1
+            return () => {
+                if (rndb(0.999))
+                    dr += PI/2
+                const arr = ff[((x + scale/2) * size/scale ) | 0];
+                if (!arr)
+                    return false
+                let a = arr[((y + scale/2) * size/scale ) | 0];
+                if (isNaN(a))
+                    return false
+                a += dr + sin(i/10)*0.1
+                x += cos(a)*step;
+                y += sin(a)*step;
+                if (noise(x*5, y*5, z, s)<-.5)
+                    return false;
+                setShape(shape);
+                fillShape(x, y,rndr(), rnd());
+                return true;
+            };
+        });
+
+        many(1111, () => agents = agents.filter(a => a()));
+    }
+
+
+</script>
+</body>
+</html>
