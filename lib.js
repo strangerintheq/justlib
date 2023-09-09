@@ -1,17 +1,18 @@
 // just lib
 // made by Stranger in the Q
 
-const {PI, min, max, sin, cos, atan2, hypot, sign, pow, abs} = Math;
+const {PI, min, max, sin, cos, atan2, hypot, sign, pow, abs, sqrt} = Math;
 const TAU = PI * 2;
-const state = {r: Math.random};
+const state = {r: Math.random, last: null, lastCanvas: null};
+const clamp = (x, a, b) => max(min(b, x), a);
 
 // random
 function setRandomGenerator(rg) {
     state.r = rg;
 }
 
-function PRNG(hash, t) {
-    const x = new Uint32Array([1, 2, 3, 4].map(i =>
+function PRNG(hash) {
+    let t, x = new Uint32Array([1, 2, 3, 4].map(i =>
         parseInt(hash.substr(i * 8, 8), 16)));
     return _ => {
         t = x[3], x[3] = x[2], x[2] = x[1], x[1] = x[0],
@@ -59,11 +60,7 @@ function rect(w, h) {
     ]
 }
 
-function polarShape(x, r) {
-
-}
-
-function noise(x, y, z, t = 3141) {
+function noise(x, y, z = 7127, t = 3141) {
     let w0 = Math.sin(0.3 * x + 1.4 * t + 2.0 + 2.5 * Math.sin(0.4 * y + -1.3 * t + 1.0));
     let w1 = Math.sin(0.2 * y + 1.5 * t + 2.8 + 2.3 * Math.sin(0.5 * z + -1.2 * t + 0.5));
     let w2 = Math.sin(0.1 * z + 1.3 * t + 1.8 + 2.1 * Math.sin(0.3 * x + -1.5 * t + 1.5));
@@ -155,14 +152,6 @@ function bind(ctx) {
 }
 
 // 2d
-// function context2d() {
-//     const c = state.lastCanvas;
-//     const ctx = c.getContext("2d");
-//     let sc = min(c.width, c.height);
-//     ctx.translate(c.width/2, c.height/2)
-//     ctx.scale(sc,sc)
-//     state.last = ctx;
-// }
 function setShape(path, close = true) {
     if (typeof path !== "string") {
         path = "M " + path.join(" L ") + (close ? " Z" : "");
@@ -181,11 +170,11 @@ function drawShape(method, x = 0, y = 0, r = 0, s = 0) {
     ctx.restore()
 }
 
-function fillShape(x=0, y=0, r=0, s=1) {
+function fillShape(x = 0, y = 0, r = 0, s = 1) {
     drawShape("fill", x, y, r, s)
 }
 
-function strokeShape(x=0, y=0, r=0, s=1) {
+function strokeShape(x = 0, y = 0, r = 0, s = 1) {
     drawShape("stroke", x, y, r, s)
 }
 
@@ -221,27 +210,180 @@ function fillRect(x, y, w, h) {
     ctx.fillRect(x, y, w, h)
 }
 
-function pseudoShader(s) {
-    let c = 2 / s
-    let n = c;
-    let m = c;
-    many(n, y => {
-        y = (0.5 + y) * s / 2
-        many(m, x => {
-            x = (0.5 + x) * s / 2;
-            frag(+y, +x);
-            frag(+y, -x);
-            frag(-y, +x);
-            frag(-y, -x);
-        });
-    });
+function fillCircle(x, y, r) {
+    const ctx = state.last;
+    ctx.beginPath()
+    ctx.ellipse(x, y, r, r, 0, 0, Math.PI * 2)
+    ctx.fill()
 }
 
-// webgl
 
-// function contextWebgl() {
-//     state.gl = state.lastCanvas.getContext('webgl');
-// }
+// color manipulations
+
+function colorComponent(str, off) {
+    return parseInt(str.substr(off, 2), 16) / 255
+}
+
+function hslOperation(color, operation) {
+    const r = colorComponent(color, 1)
+    const g = colorComponent(color, 3)
+    const b = colorComponent(color, 5)
+
+    const hsl = rgbToHsl(r, g, b)
+
+    operation(hsl)
+
+    const c = "#" + hslToRgb(...hsl).map(x => {
+        x = Math.max(Math.min(255, x * 255), 0) | 0
+        return (x < 16 ? "0" : "") + x.toString(16)
+    }).join("");
+    // console.log(c)
+    return c
+}
+
+function rgbToHsl(r, g, b) {
+    // r /= 255, g /= 255, b /= 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var h, s, l = (max + min) / 2;
+
+    if (max === min) {
+        h = s = 0; // achromatic
+    } else {
+        var d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r:
+                h = (g - b) / d + (g < b ? 6 : 0);
+                break;
+            case g:
+                h = (b - r) / d + 2;
+                break;
+            case b:
+                h = (r - g) / d + 4;
+                break;
+        }
+        h /= 6;
+    }
+
+    return [h, s, l];
+}
+
+function hslToRgb(h, s, l) {
+    var r, g, b;
+
+    if (s === 0) {
+        r = g = b = l; // achromatic
+    } else {
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1 / 3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1 / 3);
+    }
+    // r *= 255, g *= 255, b *= 255;
+    return [r, g, b];
+}
+
+function hue2rgb(p, q, t) {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+}
+
+
+// field
+//
+// coordinates is normalized to interval  from -0.5 to 0.5 at short side,
+// to be equal library default canvas coordinates
+function field(q, fn, ratio = 1) {
+    const w = q;
+    const h = q;
+    const fld = many(h, y => many(w, x => {
+        return fn((x - w / 2) / q, (y - h / 2) / q);
+    }));
+    return (x, y) => {
+        const row = fld[(y * q + h / 2) | 0];
+        return row && row[(x * q + w / 2) | 0];
+    }
+}
+
+
+// simplest quadtree
+function q3(cx, cy, hw, hh = hw) {
+
+    const w = hw / 2,
+        h = hh / 2,
+        children = [],
+        points = [];
+
+    const pointInAABB = (
+        cx, cy, hw, hh, x, y
+    ) =>
+        cx - hw < x &&
+        cx + hw > x &&
+        cy - hh < y &&
+        cy + hh > y;
+
+    const intersects = (
+        x1, y1, w1, h1,
+        x2, y2, w2, h2
+    ) => {
+        if (Math.abs(x1 - x2) > w1 + w2)
+            return false;
+        return Math.abs(y1 - y2) < h1 + h2;
+    };
+
+    return {
+        insert(x, y, r) {
+
+            if (!pointInAABB(cx, cy, hw, hh, x, y))
+                return false;
+            if (points.length < 4) {
+                points.push({x, y, r});
+                return true;
+            }
+            !children[0] && children.push(
+                q3(cx - w, cy - h, w, h),
+                q3(cx + w, cy - h, w, h),
+                q3(cx + w, cy + h, w, h),
+                q3(cx - w, cy + h, w, h)
+            );
+            for (let i = 0; i < 4; i++)
+                if (children[i].insert(x, y, r))
+                    return true;
+            return false;
+
+        },
+        circle(x, y, r) {
+
+            const result = [];
+
+            if (!intersects(x, y, r, r, cx, cy, hw, hh))
+                return result;
+
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+                if (pointInAABB(x, y, r, r, p.x, p.y))
+                    result.push(p);
+            }
+
+            if (!children[0])
+                return result;
+
+            for (let i = 0; i < 4; i++)
+                result.push(...children[i]
+                    .circle(x, y, r));
+            return result;
+
+        }
+    }
+}
+
+
+// webgl stuff
 
 const fullScreenTriangle = new Float32Array([-1, 3, -1, -1, 3, -1])
 
@@ -291,7 +433,7 @@ function webglProgram(fs, vs = defaultVertexShader) {
         gl.compileShader(id);
         const message = gl.getShaderInfoLog(id);
         if (message) {
-            src.split('\n').map((line,i) => print(line, i, message))
+            src.split('\n').map((line, i) => print(line, i, message))
             throw message;
         }
         gl.attachShader(pid, id);
@@ -360,6 +502,7 @@ function webglProgram(fs, vs = defaultVertexShader) {
         function texParam(key, value) {
             gl.texParameteri(gl.TEXTURE_2D, key, value);
         }
+
         texParam(gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         texParam(gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         texParam(gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
