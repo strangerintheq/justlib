@@ -243,13 +243,13 @@ function hslOperation(color, operation) {
 
 function rgbToHsl(r, g, b) {
     // r /= 255, g /= 255, b /= 255;
-    var max = Math.max(r, g, b), min = Math.min(r, g, b);
-    var h, s, l = (max + min) / 2;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
 
     if (max === min) {
         h = s = 0; // achromatic
     } else {
-        var d = max - min;
+        let d = max - min;
         s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
         switch (max) {
             case r:
@@ -269,13 +269,13 @@ function rgbToHsl(r, g, b) {
 }
 
 function hslToRgb(h, s, l) {
-    var r, g, b;
+    let r, g, b;
 
     if (s === 0) {
         r = g = b = l; // achromatic
     } else {
-        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        var p = 2 * l - q;
+        let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        let p = 2 * l - q;
         r = hue2rgb(p, q, h + 1 / 3);
         g = hue2rgb(p, q, h);
         b = hue2rgb(p, q, h - 1 / 3);
@@ -293,14 +293,21 @@ function hue2rgb(p, q, t) {
     return p;
 }
 
+function mask(ctx, cx, cy, hw, hh = hw) {
+    const {width: w, height: h} = ctx.canvas;
+    const d = cx.getImageData(0, 0, w, h).data;
+    return (x, y) => {
+        return false;
+    }
+}
+
 
 // field
-//
-// coordinates is normalized to interval  from -0.5 to 0.5 at short side,
-// to be equal library default canvas coordinates
-function field(q, fn, ratio = 1) {
-    const w = q;
-    const h = q;
+function field(q, fn, cx, cy, hw, hh = hw) {
+    const ratio = hw / hh;
+    const kw = ratio < 1 ? 1 : ratio;
+    const kh = ratio > 1 ? 1 : 1 / ratio;
+    const w = q * kw, h = q * kh;
     const fld = many(h, y => many(w, x => {
         return fn((x - w / 2) / q, (y - h / 2) / q);
     }));
@@ -312,38 +319,21 @@ function field(q, fn, ratio = 1) {
 
 
 // simplest quadtree
+const pointInAABB = (cx, cy, hw, hh, x, y) =>
+    cx - hw < x && cx + hw > x && cy - hh < y && cy + hh > y;
+
+const intersects = (x1, y1, w1, h1, x2, y2, w2, h2) =>
+    abs(x1 - x2) < w1 + w2 ? abs(y1 - y2) < h1 + h2 : 0;
+
 function q3(cx, cy, hw, hh = hw) {
-
-    const w = hw / 2,
-        h = hh / 2,
-        children = [],
-        points = [];
-
-    const pointInAABB = (
-        cx, cy, hw, hh, x, y
-    ) =>
-        cx - hw < x &&
-        cx + hw > x &&
-        cy - hh < y &&
-        cy + hh > y;
-
-    const intersects = (
-        x1, y1, w1, h1,
-        x2, y2, w2, h2
-    ) => {
-        if (Math.abs(x1 - x2) > w1 + w2)
-            return false;
-        return Math.abs(y1 - y2) < h1 + h2;
-    };
-
+    const w = hw / 2, h = hh / 2, children = [], points = [];
     return {
         insert(x, y, r) {
-
             if (!pointInAABB(cx, cy, hw, hh, x, y))
-                return false;
+                return 0;
             if (points.length < 4) {
                 points.push({x, y, r});
-                return true;
+                return 1;
             }
             !children[0] && children.push(
                 q3(cx - w, cy - h, w, h),
@@ -353,29 +343,23 @@ function q3(cx, cy, hw, hh = hw) {
             );
             for (let i = 0; i < 4; i++)
                 if (children[i].insert(x, y, r))
-                    return true;
-            return false;
+                    return 1;
+            return 0;
 
         },
-        circle(x, y, r) {
-
+        query(x, y, w, h = w) {
             const result = [];
-
-            if (!intersects(x, y, r, r, cx, cy, hw, hh))
+            if (!intersects(x, y, w, h, cx, cy, hw, hh))
                 return result;
-
             for (let i = 0; i < points.length; i++) {
                 const p = points[i];
-                if (pointInAABB(x, y, r, r, p.x, p.y))
+                if (pointInAABB(x, y, w, h, p.x, p.y))
                     result.push(p);
             }
-
             if (!children[0])
                 return result;
-
             for (let i = 0; i < 4; i++)
-                result.push(...children[i]
-                    .circle(x, y, r));
+                result.push(...children[i].query(x, y, w, h));
             return result;
 
         }

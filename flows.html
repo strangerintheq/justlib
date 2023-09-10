@@ -2,31 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>flows</title>
 </head>
 <body style="overflow: hidden; margin: 0">
 <script src="palettes.js"></script>
 <script src="lib.js"></script>
 <script>
-    let pal = pick(Object.values(palettes));
-    palette(pal)
-    createCanvas2d(0.75)
+    let pad = pick([0.01, 0.1, 0.05])
+    let seed = rnd(9999)
+    let ratio = 0.75;
+    let scale = pick([1, 0.95,0.9,0.85])
+    let colors = pick(Object.values(palettes));
+
+    palette(colors)
+    createCanvas2d(ratio)
     appendCanvas()
     let ctx = state.last;
-    let sc = pick([0.8])
-    ctx.scale(sc, sc)
+    ctx.scale(scale, scale)
     fillStyle(0)
     fillRect(-2, -2, 4, 4)
     strokeWidth(0.001)
 
-    let seed = rnd(9999)
-    const tree = q3(0, 0, 0.45, 0.45 / 0.75)
-    let pad = pick([0.01, 0.1, 0.05])
+    bgLines()
+
+    const tree = q3(0, 0, 0.45, 0.6)
 
     let z = 0;
-    part(0.004, pal[rndi(4) + 1])
+    part(0.004, colors[rndi(4) + 1])
     z = 1
-    part(0.01, pal[rndi(4) + 1])
+    part(0.01, colors[rndi(4) + 1])
+
+
+    function bgLines() {
+        let xx = .1, ll = .1
+        many(10111, () => {
+            strokeStyle(hslOperation(colors[0], hsl => hsl[2] += rnds(ll)))
+            let i = rnds(1.5), a = i + rnds(xx), b = i + rnds(xx);
+            let pts = rndb() ? [[a, -2], [b, 2]] : [[-2, a], [2, b]];
+            ctx.stroke(new Path2D("M" + pts.join("L")))
+        })
+    }
 
     function check(x, y, r, maxR) {
         let n = noise(22 * x, 22 * y, seed)
@@ -35,15 +50,16 @@
         if (z === 1 && n < 0)
             return true
         const candidates =
-            tree.circle(x, y, maxR + r);
+            tree.query(x, y, maxR + r);
         return candidates.find(p => {
-            return Math.hypot(p.x - x, p.y - y) < p.r + r + pad
+            return hypot(p.x - x, p.y - y) < p.r + r + pad
         })
     }
 
     function brush(r, color, pts) {
         const randomizeLightness = hsl => hsl[2] = clamp(hsl[2] + rnds(.3), 0.1, 0.9);
-        const n = sqrt(PI * Math.pow(ctx.canvas.width * r, 2));
+
+        const n = sqrt(PI * pow(ctx.canvas.width * r, 2));
         many(n, () => {
             let dr = rnd(r), a = rndr();
             let cx = cos(a) * dr, cy = sin(a) * dr;
@@ -60,48 +76,49 @@
         })
     }
 
+    function stick(r, color, pts) {
+
+    }
+
     function part(maxR, color) {
-        const centers = many(3, () => [rnds(), rnds()])
-        const ffs = 333
-        const ff = many(ffs, y => many(ffs, x => {
-            let a = noise(seed + 5 * x / ffs, 5 * y / ffs, seed) +
-                centers.map(p => 1 + Math.atan2(p[1] - y / ffs + 0.5, p[0] - x / ffs + 0.5)).reduce((a, b) => a + b, 0)
-            //console.log(a)
-            return {a}
-        }))
 
+        const turnChance = pick([0.9, 0.99, 1])
+        const centers = many(pick([3,0,1,2]), () => [rnds(), rnds()])
+        const nk = pick([0,1])
+        const angle = pick([0,1,2])
+        const flowFieldFunction = (x, y) => {
+            const c = centers.map(p => 1 + atan2(p[1] - y, p[0] - x))
+                .reduce((a, b) => a + b, 0)
+            const n = noise(seed + 5 * x, 5 * y, seed)*nk
+            return {a: n + c+ angle};
+        };
 
-        function getFf(x, y) {
-
-            x += 0.5
-            y += 0.5
-            x *= ffs
-            y *= ffs * 0.75
-            try {
-                return ff[y | 0][x | 0]
-            } catch (e) {
-            }
-
-        }
-
+        const ffd = field(333, flowFieldFunction, 0, 0, 0.4, 0.4 / ratio);
 
         const lines = []
-        const chance = pick([0.9, 0.99, 1])
-        many(9999, () => {
+
+        many(9999, singleThing)
+
+        lines.forEach(line => {
+            brush(line[0].r, color, line)
+        })
+
+        function singleThing() {
             let pts = []
             let x = rnds()
-            let y = rnds(1 / 0.75)
+            let y = rnds(1 / ratio)
             let da = 0;
             let r = rnd(maxR * 0.9, maxR * 0.1)
             let i = 0
-            while (i++ < 33 && !check(x, y, r, maxR)) {
+            while (i++ < 133 && !check(x, y, r, maxR)) {
                 pts.push({x, y, r})
-                let cell = getFf(x, y)
+                let cell = ffd(x, y)
                 if (!cell)
                     break
-                if (rndb(chance))
-                    da += pick([-1, 1]) * Math.PI / 2
+                if (rndb(turnChance))
+                    da += pick([-1, 1]) * PI / 2
                 let a = cell.a + da
+
                 x += cos(a) * r
                 y += sin(a) * r
             }
@@ -111,11 +128,7 @@
                     tree.insert(x, y, r)
                 })
             }
-        })
-
-        lines.forEach(line => {
-            brush(line[0].r, color, line)
-        })
+        }
 
     }
 
