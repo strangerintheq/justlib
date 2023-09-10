@@ -228,11 +228,8 @@ function hslOperation(color, operation) {
     const r = colorComponent(color, 1)
     const g = colorComponent(color, 3)
     const b = colorComponent(color, 5)
-
     const hsl = rgbToHsl(r, g, b)
-
     operation(hsl)
-
     const c = "#" + hslToRgb(...hsl).map(x => {
         x = Math.max(Math.min(255, x * 255), 0) | 0
         return (x < 16 ? "0" : "") + x.toString(16)
@@ -293,15 +290,6 @@ function hue2rgb(p, q, t) {
     return p;
 }
 
-function mask(ctx, cx, cy, hw, hh = hw) {
-    const {width: w, height: h} = ctx.canvas;
-    const d = cx.getImageData(0, 0, w, h).data;
-    return (x, y) => {
-        return false;
-    }
-}
-
-
 // field
 function field(q, fn, cx, cy, hw, hh = hw) {
     const ratio = hw / hh;
@@ -317,19 +305,20 @@ function field(q, fn, cx, cy, hw, hh = hw) {
     }
 }
 
-
-// simplest quadtree
-const pointInAABB = (cx, cy, hw, hh, x, y) =>
+// point in axis aligned bounding box test
+const ptXaabb = (cx, cy, hw, hh, x, y) =>
     cx - hw < x && cx + hw > x && cy - hh < y && cy + hh > y;
 
-const intersects = (x1, y1, w1, h1, x2, y2, w2, h2) =>
+// 2 axis aligned bounding boxes intersection test
+const aabbXaabb = (x1, y1, w1, h1, x2, y2, w2, h2) =>
     abs(x1 - x2) < w1 + w2 ? abs(y1 - y2) < h1 + h2 : 0;
 
+// quadtree
 function q3(cx, cy, hw, hh = hw) {
     const w = hw / 2, h = hh / 2, children = [], points = [];
     return {
         insert(x, y, r) {
-            if (!pointInAABB(cx, cy, hw, hh, x, y))
+            if (!ptXaabb(cx, cy, hw, hh, x, y))
                 return 0;
             if (points.length < 4) {
                 points.push({x, y, r});
@@ -349,11 +338,11 @@ function q3(cx, cy, hw, hh = hw) {
         },
         query(x, y, w, h = w) {
             const result = [];
-            if (!intersects(x, y, w, h, cx, cy, hw, hh))
+            if (!aabbXaabb(x, y, w, h, cx, cy, hw, hh))
                 return result;
             for (let i = 0; i < points.length; i++) {
                 const p = points[i];
-                if (pointInAABB(x, y, w, h, p.x, p.y))
+                if (ptXaabb(x, y, w, h, p.x, p.y))
                     result.push(p);
             }
             if (!children[0])
@@ -366,6 +355,20 @@ function q3(cx, cy, hw, hh = hw) {
     }
 }
 
+
+// mask
+function mask(cx, cy, hw, hh = hw) {
+    const ctx = state.last;
+    const {width: w, height: h} = ctx.canvas;
+    const d = ctx.getImageData(0, 0, w, h).data;
+    return (x, y) => {
+        x = ((x + hw) * w) | 0;
+        y = ((y + hh) * w) | 0;
+        let o = 4 * (y * w + x);
+        // console.log(o)
+        return d[o] > 128;
+    }
+}
 
 // webgl stuff
 

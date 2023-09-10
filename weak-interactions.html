@@ -8,17 +8,35 @@
 <script src="palettes.js"></script>
 <script src="lib.js"></script>
 <script>
+   // let seeds = ["0x12713838494040489013456780","0x76436789938740004040404647849"]
+   // setRandomGenerator(PRNG(pick(seeds)))
+
     let pad = pick([0.01, 0.1, 0.05])
     let seed = rnd(9999)
     let ratio = 0.75;
-    let scale = pick([1, 0.95,0.9,0.85])
+    // let scale = pick([1, 0.95, 0.9, 0.85])
     let colors = pick(Object.values(palettes));
-
     palette(colors)
     createCanvas2d(ratio)
     appendCanvas()
     let ctx = state.last;
-    ctx.scale(scale, scale)
+    // ctx.scale(scale, scale);
+    fillStyle("#fff")
+    fillRect(-2,-2,4,4)
+    fillStyle("#000")
+    fillRect(-.25,-.25,.5,.1)
+    fillRect(-.3,0,.6,.1)
+    fillRect(-.25,0.25,.5,.1)
+    const rectMask = mask(0,0,0.5,0.5/ratio)
+    // many(1000, () => {
+    //     let x = rnds()
+    //     let y = rnds(1 / ratio)
+    //     fillStyle(rectMask(x,y)?"red":"blue")
+    //     fillRect(x,y,.01,.01)
+    // })
+    // // console.log(rectMask(-0.5,-0.5/ratio))
+    // // console.log(rectMask(0,0))
+    // throw new Error()
     fillStyle(0)
     fillRect(-2, -2, 4, 4)
     strokeWidth(0.001)
@@ -84,8 +102,8 @@
 
         const turnChance = pick([0.9, 0.99, 1])
         const centers = many(pick([3,0,1,2]), () => [rnds(), rnds()])
-        const nk = pick([0,1])
-        const angle = pick([0,1,2])
+        const nk = pick([0, 1])
+        const angle = pick([0,1,2,4])
         const flowFieldFunction = (x, y) => {
             const c = centers.map(p => 1 + atan2(p[1] - y, p[0] - x))
                 .reduce((a, b) => a + b, 0)
@@ -107,6 +125,8 @@
             let pts = []
             let x = rnds()
             let y = rnds(1 / ratio)
+            if (rectMask(x,y))
+                return
             let da = 0;
             let r = rnd(maxR * 0.9, maxR * 0.1)
             let i = 0
