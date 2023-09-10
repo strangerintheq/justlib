@@ -41,29 +41,23 @@
         })
     }
 
-    function brush(r, color) {
-        function randomizeLightness(hsl) {
-            hsl[2] = clamp(hsl[2] + rnds(.3), 0.1, 0.9)
-        }
-
+    function brush(r, color, pts) {
+        const randomizeLightness = hsl => hsl[2] = clamp(hsl[2] + rnds(.3), 0.1, 0.9);
         const n = sqrt(PI * Math.pow(ctx.canvas.width * r, 2));
-        const strokes = many(n, () => {
+        many(n, () => {
             let dr = rnd(r), a = rndr();
             let cx = cos(a) * dr, cy = sin(a) * dr;
             return {x: cx, y: cy}
-        });
-        return (pts) => {
-            strokes.forEach(stroke => {
-                strokeStyle(hslOperation(color, randomizeLightness));
-                ctx.beginPath()
-                pts.forEach((pt, i) => {
-                    let x = stroke.x + pt.x;
-                    let y = stroke.y + pt.y;
-                    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-                })
-                ctx.stroke()
+        }).forEach(stroke => {
+            strokeStyle(hslOperation(color, randomizeLightness));
+            ctx.beginPath()
+            pts.forEach((pt, i) => {
+                let x = stroke.x + pt.x;
+                let y = stroke.y + pt.y;
+                i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
             })
-        }
+            ctx.stroke()
+        })
     }
 
     function part(maxR, color) {
@@ -120,7 +114,7 @@
         })
 
         lines.forEach(line => {
-            brush(line[0].r, color)(line)
+            brush(line[0].r, color, line)
         })
 
     }
