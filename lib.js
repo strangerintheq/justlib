@@ -366,7 +366,7 @@ function mask(cx, cy, hw, hh = hw) {
         y = ((y + hh) * w) | 0;
         let o = 4 * (y * w + x);
         // console.log(o)
-        return d[o] > 128;
+        return d[o] < 128;
     }
 }
 
